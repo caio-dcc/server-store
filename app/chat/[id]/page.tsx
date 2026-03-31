@@ -6,6 +6,7 @@ import { Send, Upload, Play, Pause, ArrowLeft, VolumeX, Volume2 } from 'lucide-r
 import { supabase } from '@/lib/supabase';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import Arena3D from '@/components/Arena3D';
 
 interface Message {
   id: string;
@@ -26,13 +27,6 @@ export default function ChatRoom() {
   const [channel, setChannel] = useState<any>(null);
   const [onlineUsers, setOnlineUsers] = useState(0);
 
-  // Cinema Mode States
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Initialization
@@ -51,17 +45,6 @@ export default function ChatRoom() {
     roomChannel
       .on('broadcast', { event: 'new_message' }, (payload) => {
         setMessages((prev) => [...prev, payload.payload]);
-      })
-      .on('broadcast', { event: 'sync_cinema' }, (payload) => {
-        const { url, play, time } = payload.payload;
-        if (url !== undefined) setVideoUrl(url);
-        if (videoRef.current) {
-          if (time !== undefined && Math.abs(videoRef.current.currentTime - time) > 2) {
-            videoRef.current.currentTime = time;
-          }
-          if (play) videoRef.current.play().catch(() => {});
-          else if (play === false) videoRef.current.pause();
-        }
       })
       .on('presence', { event: 'sync' }, () => {
         const state = roomChannel.presenceState();
@@ -92,62 +75,7 @@ export default function ChatRoom() {
     }
   }, [messages]);
 
-  // Arena Mockup Canvas Render Loop
-  useEffect(() => {
-    if (!canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let rafId: number;
-
-    const draw = () => {
-      // Resize to container
-      const parent = canvas.parentElement;
-      if (parent) {
-        canvas.width = parent.clientWidth;
-        canvas.height = parent.clientHeight;
-      }
-
-      // Background
-      ctx.fillStyle = '#0a0a0a';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      // Draw Arena Bounds
-      const margin = 50;
-      ctx.strokeStyle = '#991b1b';
-      ctx.lineWidth = 4;
-      ctx.strokeRect(margin, margin, canvas.width - margin * 2, canvas.height - margin * 2);
-
-      // Draw center logo/circle
-      ctx.beginPath();
-      ctx.arc(canvas.width / 2, canvas.height / 2, 40, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(153, 27, 27, 0.2)';
-      ctx.fill();
-      ctx.strokeStyle = '#ff0000';
-      ctx.stroke();
-
-      ctx.fillStyle = '#fff';
-      ctx.font = '20px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('Arena Mockup', canvas.width / 2, canvas.height / 2 + 5);
-
-      // Animate a demo dot
-      const time = Date.now() / 1000;
-      const dotX = canvas.width / 2 + Math.cos(time) * 100;
-      const dotY = canvas.height / 2 + Math.sin(time) * 100;
-      
-      ctx.beginPath();
-      ctx.arc(dotX, dotY, 10, 0, Math.PI * 2);
-      ctx.fillStyle = '#3B82F6';
-      ctx.fill();
-
-      rafId = requestAnimationFrame(draw);
-    };
-
-    draw();
-    return () => cancelAnimationFrame(rafId);
-  }, []);
+  // 2D Mockup logic removed in favor of Arena3D component
 
   const sendMessage = () => {
     if (!inputText.trim() || !channel) return;
@@ -171,57 +99,12 @@ export default function ChatRoom() {
     setInputText('');
   };
 
-  const handleFileUpload = async (file: File | null) => {
-    if (!file || !channel) return;
-    setUploading(true);
-    
-    // Fallback if no Storage bucket exists: create a local blob for immediate peer broadcast
-    // In production, this uploads to Supabase Storage and broadcasts the public URL.
-    try {
-      const fileName = `${Date.now()}_${file.name}`;
-      const { data, error } = await supabase.storage.from('cinema').upload(`room_${id}/${fileName}`, file);
-      
-      let finalUrl = '';
-      if (error) {
-        console.warn('Storage bucket "cinema" might not exist or RLS blocked. Sincronizando apenas a nivel de mockup...', error);
-        // Fallback mockup
-        finalUrl = URL.createObjectURL(file);
-      } else {
-        const { data: publicData } = supabase.storage.from('cinema').getPublicUrl(data.path);
-        finalUrl = publicData.publicUrl;
-      }
-
-      setVideoUrl(finalUrl);
-      channel.send({
-        type: 'broadcast',
-        event: 'sync_cinema',
-        payload: { url: finalUrl, play: true, time: 0 }
-      });
-      setIsPlaying(true);
-    } catch (err) {
-      console.error(err);
-    }
-    setUploading(false);
-  };
-
-  const syncPlayPause = (play: boolean) => {
-    if (!channel || !videoRef.current) return;
-    setIsPlaying(play);
-    if (play) videoRef.current.play();
-    else videoRef.current.pause();
-
-    channel.send({
-      type: 'broadcast',
-      event: 'sync_cinema',
-      payload: { play, time: videoRef.current.currentTime }
-    });
-  };
-
   // Completely overlay global layout
   return (
     <Flex style={{ position: 'fixed', inset: 0, zIndex: 1500, backgroundColor: '#000', color: '#fff' }}>
       
-      <Box w={{ base: '100%', sm: '20%' }} h="100%" p="md" style={{ borderRight: '1px solid #1a1a1a', backgroundColor: '#060606', display: 'flex', flexDirection: 'column' }}>
+      {/* Left - Sidebar (10%) */}
+      <Box w={{ base: '100%', sm: '10%' }} h="100%" p="md" style={{ borderRight: '1px solid #1a1a1a', backgroundColor: '#060606', display: 'flex', flexDirection: 'column' }}>
         <Title order={2} c="rubyRed" style={{ fontStyle: 'italic' }}>$erver</Title>
         <Badge mt="sm" color="green" variant="dot">{onlineUsers} Online</Badge>
         
@@ -229,16 +112,6 @@ export default function ChatRoom() {
           <Text c="dimmed" size="xs" fw={700} tt="uppercase">Navegação Principal</Text>
           <Button variant="subtle" color="gray" justify="flex-start" component={Link} href="/">Home</Button>
           <Button variant="subtle" color="gray" justify="flex-start" component={Link} href="/colecoes">Vitrine</Button>
-          
-          <Text c="dimmed" size="xs" fw={700} tt="uppercase" mt="xl">Modo Cinema (Host)</Text>
-          
-          <FileButton onChange={handleFileUpload} accept="video/mp4,video/webm">
-            {(props) => (
-              <Button {...props} variant="light" color="rubyRed" leftSection={uploading ? <Loader size={16}/> : <Upload size={16}/>}>
-                {uploading ? 'Enviando...' : 'Subir Arquivo (Sync)'}
-              </Button>
-            )}
-          </FileButton>
         </Stack>
         
         <Button fullWidth color="dark" variant="outline" leftSection={<ArrowLeft size={16}/>} component={Link} href="/">
@@ -246,26 +119,13 @@ export default function ChatRoom() {
         </Button>
       </Box>
 
-      {/* Center - Arena / Cinema (50%) */}
-      <Box w={{ base: '100%', sm: '50%' }} h="100%" style={{ position: 'relative' }}>
-        <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
-        
-        {videoUrl && (
-          <Box style={{ position: 'absolute', inset: 0, backgroundColor: '#000', zIndex: 10, display: 'flex', flexDirection: 'column' }}>
-            <video 
-              ref={videoRef} 
-              src={videoUrl} 
-              style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
-              onPlay={() => syncPlayPause(true)}
-              onPause={() => syncPlayPause(false)}
-              controls
-            />
-          </Box>
-        )}
+      {/* Center - Arena (75%) */}
+      <Box w={{ base: '100%', sm: '75%' }} h="100%" style={{ position: 'relative' }}>
+        <Arena3D />
       </Box>
 
-      {/* Right - Chat (30%) */}
-      <Box w={{ base: '100%', sm: '30%' }} h="100%" p="md" style={{ borderLeft: '1px solid #1a1a1a', backgroundColor: '#0a0a0a', display: 'flex', flexDirection: 'column' }}>
+      {/* Right - Chat (15%) */}
+      <Box w={{ base: '100%', sm: '15%' }} h="100%" p="md" style={{ borderLeft: '1px solid #1a1a1a', backgroundColor: '#0a0a0a', display: 'flex', flexDirection: 'column' }}>
         <Group justify="space-between" mb="md">
           <Title order={4}>Chat ao Vivo</Title>
           <Badge color="blue" variant="light">#{id}</Badge>

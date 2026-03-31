@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
+import { getValidatedProduct } from '@/lib/products';
 
 export async function POST(req: Request) {
   try {
@@ -9,22 +10,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Carrinho vazio' }, { status: 400 });
     }
 
-    // SECURITY AUDIT WARNING: 
-    // Currently, `item.price` is inherently trusted from the client payload. 
-    // In production, an attacker could manipulate this payload (e.g., send { price: 0.01 }) 
-    // and successfully buy premium products for 1 cent.
-    // PRODUCTION FIX REQUIRED: Do not map `item.price` from the client. Instead, lookup the 
-    // authentic price directly from Supabase `public.products` or the Printify API using `item.id`.
-    const line_items = items.map((item: any) => ({
-      price_data: {
-        currency: 'brl',
-        product_data: {
-          name: `${item.name} - ${item.size || ''} ${item.color || ''}`.trim(),
-          images: [item.image].filter(Boolean),
+    // SECURITY FIX: Fetch real prices from server-side source of truth
+    const line_items = await Promise.all(items.map(async (item: any) => {
+      const validated = await getValidatedProduct(item.productId || item.id, item.variantId);
+      
+      if (!validated) {
+        throw new Error(`Produto não encontrado: ${item.name}`);
+      }
+
+      return {
+        price_data: {
+          currency: 'brl',
+          product_data: {
+            name: `${validated.name} - ${item.size || ''} ${item.color || ''}`.trim(),
+            images: [validated.image].filter(Boolean),
+          },
+          unit_amount: Math.round(validated.price * 100),
         },
-        unit_amount: Math.round(item.price * 100),
-      },
-      quantity: item.quantity,
+        quantity: item.quantity,
+      };
     }));
 
     // Compress cart for metadata (p = productId, v = variantId, q = quantity)

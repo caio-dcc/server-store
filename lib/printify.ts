@@ -65,3 +65,25 @@ export async function createPrintifyOrder(session: any) {
 
   return await response.json();
 }
+
+export async function getPrintifyProduct(productId: string) {
+  const apiKey = process.env.PRINTIFY_API_KEY;
+  const shopId = process.env.PRINTIFY_SHOP_ID;
+
+  if (!apiKey || !shopId) {
+    throw new Error('Printify API Key or Shop ID missing');
+  }
+
+  const response = await fetch(`${PRINTIFY_BASE_URL}/shops/${shopId}/products/${productId}.json`, {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return await response.json();
+}

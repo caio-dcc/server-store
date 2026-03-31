@@ -6,6 +6,7 @@ import { theme } from '../theme';
 import { Footer } from '@/components/Footer';
 import { Navbar } from '@/components/Navbar';
 import { CartProvider } from '@/contexts/CartContext';
+import { CookieBanner } from '@/components/CookieBanner';
 import { CartDrawer } from '@/components/CartDrawer';
 import { Notifications } from '@mantine/notifications';
 import Grainient from '@/components/Grainient';
@@ -68,6 +69,7 @@ export default function RootLayout({
               <Footer />
             </Box>
             <CartDrawer />
+            <CookieBanner />
           </CartProvider>
 
         </MantineProvider>
